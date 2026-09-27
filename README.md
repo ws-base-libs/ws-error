@@ -133,14 +133,18 @@ The intended extension is **your code enum, not this struct**:
 
 ```cpp
 namespace system {
-enum class error_type { NotFound, InvalidState, Timeout };   // named, yours
-using system_error = ws::Error<error_type>;
+enum class SystemErrorCode { NotFound, InvalidState, Timeout };   // named, yours
+using SystemError = ws::Error<SystemErrorCode>;
 }
 ```
 
-1. Define `enum class your_error_type { ... }` where the errors are raised.
-2. `using your_error = ws::Error<your_error_type>;` in that layer's types header.
+1. Define `enum class YourErrorCode { ... }` where the errors are raised.
+2. `using YourError = ws::Error<YourErrorCode>;` in that layer's types header.
 3. Add codes to the enum as your domain grows.
+
+Names are PascalCase throughout — the enum `SystemErrorCode`, its values
+`SystemErrorCode::InvalidState`, the alias `SystemError` — matching
+`ModelErrorCode` in the usage above.
 
 `Code` is constrained to a **scoped enum** — `enum class`, not an int and not a
 plain enum. That is enforced at compile time rather than left to convention: a

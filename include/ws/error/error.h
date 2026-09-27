@@ -30,8 +30,8 @@ namespace ws::core::error {
 /// ANY layer defines its own typed errors by owning its own enum:
 ///
 ///     namespace system {
-///     enum class error_type { NotFound, InvalidState, Timeout };   // named, yours
-///     using system_error = ws::Error<error_type>;
+///     enum class SystemErrorCode { NotFound, InvalidState, Timeout };   // named, yours
+///     using SystemError = ws::Error<SystemErrorCode>;
 ///     }
 ///
 /// The struct is never duplicated — only the enum is. That is the whole

@@ -49,8 +49,8 @@ using TestError = ws::Error<Code>;
 // it: ANY layer owns its own typed errors by owning its own enum. The struct is
 // never duplicated — only the enum is.
 namespace system {
-enum class error_type { NotFound, InvalidState, Timeout };
-using system_error = ws::Error<error_type>;
+enum class SystemErrorCode { NotFound, InvalidState, Timeout };
+using SystemError = ws::Error<SystemErrorCode>;
 }  // namespace system
 
 }  // namespace
@@ -140,11 +140,11 @@ int main() {
         static_assert(std::is_scoped_enum_v<Code>, "Code must be an enum class");
         check(true, "enum class codes satisfy the constraint");
 
-        static_assert(std::is_same_v<system::system_error, ws::Error<system::error_type>>);
-        system::system_error const e{.code = system::error_type::Timeout,
+        static_assert(std::is_same_v<system::SystemError, ws::Error<system::SystemErrorCode>>);
+        system::SystemError const e{.code = system::SystemErrorCode::Timeout,
                                      .context = {"waited 30s for the model"}};
-        check(e.code == system::error_type::Timeout,
-              "system::error_type works exactly like any other code");
+        check(e.code == system::SystemErrorCode::Timeout,
+              "system::SystemErrorCode works exactly like any other code");
         check(e.context.size() == 1, "and carries its own context");
     }
 
