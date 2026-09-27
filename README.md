@@ -15,13 +15,15 @@ Most error enums answer *what* failed and nothing else. When the same code can b
 raised from five places — `FileNotFound` from the config reader, the model loader,
 the snapshot store — the caller cannot tell which one fired.
 
-`Error<Code>` pairs a strongly-typed enum with two optional context fields:
+`Error<Code>` pairs a strongly-typed enum with three detail fields — two optional
+strings and an open-ended `context` chain:
 
 | Field | Type | Purpose |
 |---|---|---|
 | `code` | `Code` (a strongly-typed `enum class`) | What failed. Strongly typed so an auth error cannot be compared against a cache error by accident. |
 | `message` | `std::optional<std::string>` | Why, in human terms. |
 | `source` | `std::optional<std::string>` | Where — `file:line` or `System::method`. Fill it in whenever the code has more than one call site. |
+| `context` | `std::vector<std::string>` | Anything else worth passing back, one string per observation — a request id and sender, a path that was tried, the value that was rejected. Layers **append** as the error travels outward, so the caller gets the whole story rather than the innermost sentence. |
 
 It is designed to be the `E` in `std::expected<T, E>`.
 
@@ -62,10 +64,12 @@ a failure means.
 namespace ws::core::error {
 
 template <typename Code>
+    requires std::is_scoped_enum_v<Code>
 struct Error {
     Code                              code{};
     std::optional<std::string>        message{};
     std::optional<std::string>        source{};
+    std::vector<std::string>          context{};
 };
 
 }  // namespace ws::core::error
@@ -101,7 +105,7 @@ through FetchContent never drags our test binary into your build.
 Consuming via CMake:
 
 ```cmake
-FetchContent_Declare(ws-error GIT_REPOSITORY <this repo> GIT_TAG v0.1.0)
+FetchContent_Declare(ws-error GIT_REPOSITORY <this repo> GIT_TAG v0.2.0)
 FetchContent_MakeAvailable(ws-error)
 target_link_libraries(your_target PRIVATE ws-error)
 ```
@@ -127,14 +131,28 @@ every version bump.
 
 The intended extension is **your code enum, not this struct**:
 
-1. Define `enum class YourErrorCode { ... }` where the errors are raised.
-2. `using YourError = ws::Error<YourErrorCode>;` in that layer's types header.
+```cpp
+namespace system {
+enum class error_type { NotFound, InvalidState, Timeout };   // named, yours
+using system_error = ws::Error<error_type>;
+}
+```
+
+1. Define `enum class your_error_type { ... }` where the errors are raised.
+2. `using your_error = ws::Error<your_error_type>;` in that layer's types header.
 3. Add codes to the enum as your domain grows.
+
+`Code` is constrained to a **scoped enum** — `enum class`, not an int and not a
+plain enum. That is enforced at compile time rather than left to convention: a
+named code is what makes `r.error().code == ModelErrorCode::FileNotFound`
+readable, and a numeric one would quietly put us back where bare int codes
+started. Every layer gets its own named codes; the struct is never duplicated.
 
 If you find yourself wanting to add fields to `Error`, resist: a field that only
 one layer needs belongs in that layer's own error type, and a field every layer
 needs is worth proposing upstream as a versioned change. Keeping the struct to
-three fields is what makes one type acceptable everywhere.
+these four fields — with `context` as the catch-all for anything else — is what
+makes one type acceptable everywhere.
 
 ## Licence
 

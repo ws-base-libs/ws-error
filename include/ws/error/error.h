@@ -17,17 +17,27 @@
 
 #include <optional>
 #include <string>
+#include <type_traits>
+#include <vector>
 
 namespace ws::core::error {
 
-/// The universal error value. Returned as `std::expected<T, Error<Code>>`.
+/// The code must be a **scoped enum** (`enum class`), not an int and not a plain
+/// enum. That is enforced here rather than hoped for: a named code is what makes
+/// `r.error().code == ModelErrorCode::FileNotFound` readable, and a numeric one
+/// would quietly put us back where bare int codes started.
 ///
-/// `Code` is always a strongly-typed `enum class` owned by the layer that
-/// raises the error (`AppErrorCode`, `SystemErrorCode`, `BusErrorCode`,
-/// `ModelErrorCode`, ...). Aliasing one of these per layer — `using ModelError =
-/// ws::Error<ModelErrorCode>;` — is the intended usage; the struct itself is
-/// never duplicated.
+/// ANY layer defines its own typed errors by owning its own enum:
+///
+///     namespace system {
+///     enum class error_type { NotFound, InvalidState, Timeout };   // named, yours
+///     using system_error = ws::Error<error_type>;
+///     }
+///
+/// The struct is never duplicated — only the enum is. That is the whole
+/// extension model.
 template <typename Code>
+    requires std::is_scoped_enum_v<Code>
 struct Error {
     /// What failed. Strongly typed so a caller cannot compare an auth error
     /// against a cache error by accident.
@@ -40,6 +50,18 @@ struct Error {
     /// The origin — `file:line`, or `System::method`. Optional, but fill it in
     /// whenever the code is raised from more than one call site.
     std::optional<std::string> source{};
+
+    /// Anything else worth passing back, as one string per observation — what a
+    /// layer knew at the point of failure, a request id and sender, a path that
+    /// was tried, the value that was rejected.
+    ///
+    /// Zero or more, which is what "optional" means for a list: empty is the
+    /// common case and costs nothing. It is a vector rather than an
+    /// `optional<vector>` deliberately — one layer of emptiness is enough — and
+    /// rather than a single `optional<string>` because the useful case is a
+    /// CHAIN: each layer appends what it knew as the error travels outward, and
+    /// the caller gets the whole story instead of the innermost sentence.
+    std::vector<std::string> context{};
 };
 
 }  // namespace ws::core::error

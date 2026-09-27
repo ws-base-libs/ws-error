@@ -18,6 +18,7 @@
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace {
 
@@ -43,6 +44,14 @@ enum class Code {
 };
 
 using TestError = ws::Error<Code>;
+
+// The documented extension pattern, exercised exactly as the README documents
+// it: ANY layer owns its own typed errors by owning its own enum. The struct is
+// never duplicated — only the enum is.
+namespace system {
+enum class error_type { NotFound, InvalidState, Timeout };
+using system_error = ws::Error<error_type>;
+}  // namespace system
 
 }  // namespace
 
@@ -100,6 +109,43 @@ int main() {
         static_assert(std::is_copy_constructible_v<TestError>);
         static_assert(std::is_move_constructible_v<TestError>);
         check(true, "complete, copyable, movable, destructible value type");
+    }
+
+    section("context: zero-or-more strings, each a separate observation");
+    {
+        TestError const none{};
+        check(none.context.empty(), "context defaults to empty (the common case)");
+
+        TestError const chained{.code = Code::FileNotFound,
+                                .message = std::string{"load failed"},
+                                .source = std::string{"ModelSystem::load"},
+                                .context = {"request req-1 from transport",
+                                            "tried /models/a.gguf",
+                                            "tried /models/b.gguf"}};
+        check(chained.context.size() == 3, "every observation is preserved");
+        check(chained.context.front() == "request req-1 from transport",
+              "first observation round-trips");
+        check(chained.context.back() == "tried /models/b.gguf",
+              "last observation round-trips");
+
+        // The chain model: a layer appends what it knew as the error travels
+        // outward, and the caller gets the whole story.
+        TestError accumulated = chained;
+        accumulated.context.push_back("App::start could not recover");
+        check(accumulated.context.size() == 4, "layers can append to the chain");
+    }
+
+    section("codes are NAMED enums, enforced at compile time");
+    {
+        static_assert(std::is_scoped_enum_v<Code>, "Code must be an enum class");
+        check(true, "enum class codes satisfy the constraint");
+
+        static_assert(std::is_same_v<system::system_error, ws::Error<system::error_type>>);
+        system::system_error const e{.code = system::error_type::Timeout,
+                                     .context = {"waited 30s for the model"}};
+        check(e.code == system::error_type::Timeout,
+              "system::error_type works exactly like any other code");
+        check(e.context.size() == 1, "and carries its own context");
     }
 
     std::printf("\nws-error tests: %d checks, %d failures\n", g_checks, g_failures);
