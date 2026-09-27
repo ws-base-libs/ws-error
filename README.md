@@ -15,7 +15,8 @@ Most error enums answer *what* failed and nothing else. When the same code can b
 raised from five places — `FileNotFound` from the config reader, the model loader,
 the snapshot store — the caller cannot tell which one fired.
 
-`Error<Code>` pairs a strongly-typed enum with two optional context fields:
+`Error<Code>` pairs a strongly-typed enum with three detail fields — two optional
+strings and an open-ended `context` chain:
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -104,7 +105,7 @@ through FetchContent never drags our test binary into your build.
 Consuming via CMake:
 
 ```cmake
-FetchContent_Declare(ws-error GIT_REPOSITORY <this repo> GIT_TAG v0.1.0)
+FetchContent_Declare(ws-error GIT_REPOSITORY <this repo> GIT_TAG v0.2.0)
 FetchContent_MakeAvailable(ws-error)
 target_link_libraries(your_target PRIVATE ws-error)
 ```
@@ -150,7 +151,8 @@ started. Every layer gets its own named codes; the struct is never duplicated.
 If you find yourself wanting to add fields to `Error`, resist: a field that only
 one layer needs belongs in that layer's own error type, and a field every layer
 needs is worth proposing upstream as a versioned change. Keeping the struct to
-three fields is what makes one type acceptable everywhere.
+these four fields — with `context` as the catch-all for anything else — is what
+makes one type acceptable everywhere.
 
 ## Licence
 

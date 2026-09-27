@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ws-error
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "Universal C++23 error contract: strongly-typed Error<Code> for std::expected"
     LANGUAGES CXX)
 
